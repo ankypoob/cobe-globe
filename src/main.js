@@ -38,11 +38,15 @@ let velocityPhi = 0;
 let velocityTheta = 0;
 let autoRotate = true;
 let idleTimer = 0;
-let pixelWidth = 600;
+let raf = 0;
 const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function cssSize() {
+  return Math.max(1, Math.round(canvas.clientWidth || 600));
 }
 
 function scheduleAutoRotate() {
@@ -52,53 +56,52 @@ function scheduleAutoRotate() {
   }, IDLE_MS);
 }
 
-function sizeCanvas() {
-  const side = canvas.clientWidth || 600;
-  pixelWidth = Math.max(1, Math.round(side * dpr));
-  canvas.width = pixelWidth;
-  canvas.height = pixelWidth;
-}
-
-sizeCanvas();
-
 const globe = createGlobe(canvas, {
   devicePixelRatio: dpr,
-  width: pixelWidth,
-  height: pixelWidth,
+  width: cssSize(),
+  height: cssSize(),
   phi,
   theta,
   dark: 1,
-  diffuse: 1.25,
+  diffuse: 1.2,
   scale: 1.05,
-  mapSamples: 18000,
+  mapSamples: 16000,
   mapBrightness: 6,
-  baseColor: [0.22, 0.32, 0.48],
+  baseColor: [0.35, 0.5, 0.75],
   markerColor: [0.49, 0.83, 0.99],
-  glowColor: [0.08, 0.12, 0.2],
+  glowColor: [0.55, 0.72, 1],
   markers,
   arcs,
   arcColor: [0.49, 0.83, 0.99],
   arcWidth: 0.45,
   arcHeight: 0.28,
   markerElevation: 0.02,
-  onRender(state) {
-    if (!dragging) {
-      phi += velocityPhi;
-      theta = clamp(theta + velocityTheta, MIN_THETA, MAX_THETA);
-      velocityPhi *= FRICTION;
-      velocityTheta *= FRICTION;
-
-      if (autoRotate && Math.abs(velocityPhi) < 0.0004) {
-        phi += AUTO_ROTATE_SPEED;
-      }
-    }
-
-    state.phi = phi;
-    state.theta = theta;
-    state.width = pixelWidth;
-    state.height = pixelWidth;
-  },
 });
+
+function tick() {
+  if (!dragging) {
+    phi += velocityPhi;
+    theta = clamp(theta + velocityTheta, MIN_THETA, MAX_THETA);
+    velocityPhi *= FRICTION;
+    velocityTheta *= FRICTION;
+
+    if (autoRotate && Math.abs(velocityPhi) < 0.0004) {
+      phi += AUTO_ROTATE_SPEED;
+    }
+  }
+
+  const side = cssSize();
+  globe.update({
+    phi,
+    theta,
+    width: side,
+    height: side,
+  });
+
+  raf = window.requestAnimationFrame(tick);
+}
+
+raf = window.requestAnimationFrame(tick);
 
 canvas.addEventListener("pointerdown", (event) => {
   dragging = true;
@@ -133,12 +136,7 @@ function endDrag() {
 canvas.addEventListener("pointerup", endDrag);
 canvas.addEventListener("pointercancel", endDrag);
 
-const resizeObserver = new ResizeObserver(() => {
-  sizeCanvas();
-});
-resizeObserver.observe(canvas);
-
 window.addEventListener("pagehide", () => {
-  resizeObserver.disconnect();
+  window.cancelAnimationFrame(raf);
   globe.destroy();
 });
